@@ -1,0 +1,314 @@
+;   ***************************************************************
+;   * Copyright (C) 2008, Embed Inc (http://www.embedinc.com)     *
+;   *                                                             *
+;   * Permission to copy this file is granted as long as this     *
+;   * copyright notice is included in its entirety at the         *
+;   * beginning of the file, whether the file is copied in whole  *
+;   * or in part and regardless of whether other information is   *
+;   * added to the copy.                                          *
+;   *                                                             *
+;   * The contents of this file may be used in any way,           *
+;   * commercial or otherwise.  This file is provided "as is",    *
+;   * and Embed Inc makes no claims of suitability for a          *
+;   * particular purpose nor assumes any liability resulting from *
+;   * its use.                                                    *
+;   ***************************************************************
+;
+;   Control the target chip Vdd line.
+;
+;   This module exports the following standard routines used during normal
+;   operation:
+;
+;     VDD_OFF  -  Set the Vdd line to high impedence.
+;
+;     VDD_ZERO -  Drive Vdd low to as close to 0 volts as possible.
+;
+;     VDD_ON   -  Drive Vdd high to the previously set voltage.
+;
+;     VDD_SETV -  Set the voltage Vdd will be driven high to when next
+;                 enabled.  REG0 contains the new voltage with 0-250 mapping
+;                 to 0-6 volts.
+;
+;     Any of the above routines may wait for a while or start a new
+;     wait interval that is still active on return.  These routines must not
+;     be called with a wait interval in progress.
+;
+;     VDD_ABORT - Disables all Vdd output drivers to the extent possible.
+;                 The purpose of this routine is to shut down the Vdd output
+;                 drivers on a voltage fault.  This happens if a wait
+;                 for a specific Vdd voltage expires before the voltage
+;                 reaches the desired value within the error threshold.
+;                 This routine never changes the current wait interval state.
+;
+/include "eusb.ins.aspic"
+
+         extern_flags        ;declare global flag bits EXTERN
+;
+;*******************************************************************************
+;
+;   Configuration constants.
+;
+
+
+
+
+/const   wvddon  real = 100  ;max milliseconds to wait next operation after Vdd on
+/const   wvddzero real = 100 ;max milliseconds to wait next operation after Vdd to zero
+/const   decayms real = 25   ;mS for voltage to settle after PWM value change
+vddmaxmv equ     6000        ;mV Vdd at 100% PWM duty cycle
+defmv    equ     5000        ;mV Vdd default value
+lbank    equ     1           ;register bank for the local state of this module
+
+ccp1conv equ     b'00001100' ;CCP1CON value with low duty cycle bits 0
+                 ; XX------  unimplemented
+                 ; --00----  duty cycle fraction bits, will be merged in as needed
+                 ; ----1100  select PWM mode
+;
+;   Derived constants.
+;
+lbankadr equ     bankadr(lbank) ;address within local state register bank
+;
+;   Symbolic constants for the current Vdd state.  None of these have the
+;   value 0, which can be used to force explicit setting of the output state
+;   next call.
+;
+vddsof   equ     1           ;current Vdd state is OFF (high impedence)
+vddsze   equ     2           ;current Vdd state is driving low to ground
+vddson   equ     3           ;current Vdd state is driving high to VDDVAL value
+;
+;*******************************************************************************
+;
+;   Global state.  All this state is assumed to be in the GBANK register
+;   bank by other modules.
+;
+         defram  gbankadr
+
+pwm1h    res     1           ;high 8 bits of 10 bit PWM
+pwm1l    res     1           ;full CCP1CON value with low 2 PWM bits
+
+         global  pwm1h, pwm1l
+;
+;*******************************************************************************
+;
+;   Local state.
+;
+         defram  lbankadr
+
+vddst    res     1           ;ID for current Vdd state, use VDDSx
+vddval   res     1           ;0-250 Vdd voltage for Vdd ON state, units of 24mV
+
+.vdd     code
+;
+;*******************************************************************************
+;
+;   Macro MAKE_VAL_VDD <millivolts>
+;
+;   Set the assembler variable VAL_VDD to the closest value to represent the
+;   indicated millivolts.  VAL_VDD is in units of 24mV
+;
+make_val_vdd macro mv
+
+val_vdd  set     ((mv) + 12) / 24 ;convert to 24mV units
+  if val_vdd > 255
+val_vdd  set     255         ;clip to single byte value
+    endif
+         endm
+;
+;*******************************************************************************
+;
+;   Subroutine VDD_INIT
+;
+;   Initialize the hardware and software state managed by this module.
+;
+         glbsub  vdd_init, noregs
+;
+;   Set up CCP1 module in PWM mode.
+;
+         dbankif ccpr1l
+         clrf    ccpr1l      ;init the duty cycle high bits to zero
+
+         dbankif ccp1con
+         movlw   ccp1conv
+         movwf   ccp1con     ;configure CCP1 for PWM, low duty cycle bits 0
+;
+;   Init local state.
+;
+         mcall   vdd_defaults ;set Vdd default settings
+
+         dbankif lbankadr
+         movlw   vddsof      ;init to indicate Vdd state is high impedence
+         movwf   vddst
+
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VDD_DEFAULTS
+;
+;   Reset the Vdd setting to its default level.
+;
+         glbsub  vdd_defaults, noregs
+
+         make_val_vdd defmv  ;make internal byte value for default voltage in VAL_VDD
+         dbankif lbankadr
+         movlw   val_vdd     ;init the current Vdd settings to the default voltage
+         movwf   vddval
+
+         clrf    vddst       ;indicate current Vdd setting is unknown
+
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VDD_OFF
+;
+;   Set the Vdd line to high impedence.
+;
+         glbsub  vdd_off, noregs
+
+         dbankif lbankadr
+         movf    vddst, w    ;get current state ID
+         xorlw   vddsof      ;compare to OFF state
+         bz      voff_leave  ;already in desired state ?
+         movlw   vddsof      ;indicate the new state
+         movwf   vddst
+
+         dbankif vdddrain_lat
+         bcf     vdddrain_pinlat ;make sure low side driver is off
+
+         dbankif gbankadr
+         clrf    pwm1h       ;PWM duty cycle value to load next clock tick
+         movlw   ccp1conv
+         movwf   pwm1l
+         bsf     flag_pwm1   ;indicate to reload this PWM next clock tick
+         bcf     flag_vddon  ;indicate Vdd is off
+
+         startwait decayms   ;start wait time for everything to stabilize
+
+voff_leave unbank            ;common exit point
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VDD_ZERO
+;
+;   Force the target chip Vdd to 0.
+;
+         glbsub  vdd_zero, regf0 | regf1
+
+         dbankif lbankadr
+         movf    vddst, w    ;get current state ID
+         xorlw   vddsze      ;compare to ZERO state
+         bz      vzero_leave ;already in desired state ?
+         movlw   vddsze      ;indicate the new state
+         movwf   vddst
+
+         dbankif gbankadr
+         clrf    pwm1h       ;PWM duty cycle value to load next clock tick
+         movlw   ccp1conv
+         movwf   pwm1l
+         bsf     flag_pwm1   ;indicate to reload this PWM next clock tick
+         bcf     flag_vddon  ;indicate Vdd will be off
+         waitms  decayms     ;wait for high side voltage drive to reach zero
+
+         dbankif vdddrain_lat
+         bsf     vdddrain_pinlat ;turn on low side driver
+
+         startwait wvddzero  ;start time interval until next operation allowed
+         loadk16 reg0, 100   ;set wait for Vdd reaches 100mV within tolerance
+         gcall   wait_vdd
+
+vzero_leave unbank           ;skip to here if Vdd already set this way
+         leaverest
+;
+;*******************************************************************************
+;
+;   Local subroutine VDD_SETPWM
+;
+;   Cause the PWM duty cycle to be set to produce the voltage indicated by
+;   VDDVAL.  The wait interval for Vdd to reach the new value will be started.
+;
+         locsub  vdd_setpwm, regf0 | regf1
+
+         dbankif lbankadr
+         movf    vddval, w   ;get 0-250 voltage in units of 24mV
+
+         dbankif gbankadr
+         movwf   pwm1h       ;set high 8 duty cycle bits for next clock tick
+         movlw   ccp1conv
+         movwf   pwm1l
+         bsf     flag_pwm1   ;cause reload of duty cycle next clock tick
+;
+;   Set up the wait condition for Vdd to reach its new level.
+;
+         startwait wvddon    ;set max mS to wait for Vdd to reach the new level
+         dbankif lbankadr
+         movf    vddval, w   ;get new Vdd level in 24mV units
+         mullw   24          ;make millivolts in PRODH:PRODL
+         movff   prodl, reg0 ;get mV into REG1:REG0
+         movff   prodh, reg1
+         gcall   wait_vdd    ;indicate target millivolts to reach for wait end
+
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VDD_NORM, VDD_ON
+;
+;   Set the target Vdd voltage to the "norm" level for this chip.  VDD_ON
+;   is a synonim for VDD_NORM in this programmer.
+;
+         glbent  vdd_on
+         glbsub  vdd_norm, noregs
+
+         dbankif lbankadr
+         movf    vddst, w    ;get current state ID
+         xorlw   vddson      ;compare to ON state
+         bz      von_leave   ;already in desired state ?
+         movlw   vddson      ;indicate the new state
+         movwf   vddst
+
+         dbankif vdddrain_lat
+         bcf     vdddrain_pinlat ;disable low side driver
+         mcall   vdd_setpwm  ;set PWM duty cycle for the new voltage, start wait
+         dbankif gbankadr
+         bsf     flag_vddon  ;indicate Vdd is on
+
+von_leave unbank             ;skip to here if Vdd already set this way
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VDD_SETV
+;
+;   Set the Vdd voltage for when Vdd is turned on.  The new level only
+;   takes effect the next time Vdd transitions to enabled.  The new
+;   desired voltage is in REG0 with 0-250 mapping to 0-6 volts.
+;
+         glbsub  vdd_setv, noregs
+
+         movff   reg0, vddval ;update level to use next time enabled
+
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VDD_ABORT
+;
+;   Shut off any Vdd drive.  This routine is intended to be called when Vdd
+;   has not reached the intended voltage within tolerance when a wait for a
+;   specific Vdd level elapses.
+;
+         glbsub  vdd_abort, noregs
+
+         dbankif vdddrain_lat
+         bcf     vdddrain_pinlat ;make sure low side driver is off
+
+         dbankif gbankadr
+         clrf    pwm1h       ;PWM duty cycle value to load next clock tick
+         movlw   ccp1conv
+         movwf   pwm1l
+         bsf     flag_pwm1   ;indicate to reload this PWM next clock tick
+         bcf     flag_vddon  ;indicate Vdd is off
+
+         end

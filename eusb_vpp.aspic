@@ -1,0 +1,443 @@
+;   ***************************************************************
+;   * Copyright (C) 2008, Embed Inc (http://www.embedinc.com)     *
+;   *                                                             *
+;   * Permission to copy this file is granted as long as this     *
+;   * copyright notice is included in its entirety at the         *
+;   * beginning of the file, whether the file is copied in whole  *
+;   * or in part and regardless of whether other information is   *
+;   * added to the copy.                                          *
+;   *                                                             *
+;   * The contents of this file may be used in any way,           *
+;   * commercial or otherwise.  This file is provided "as is",    *
+;   * and Embed Inc makes no claims of suitability for a          *
+;   * particular purpose nor assumes any liability resulting from *
+;   * its use.                                                    *
+;   ***************************************************************
+;
+;   Control the target chip Vpp line.
+;
+;   This module exports the following standard routines used during normal
+;   operation:
+;
+;     VPP_OFF  -  Set the Vpp line to high impedence.
+;
+;     VPP_ZERO -  Drive Vpp low to as close to 0 volts as possible.
+;
+;     VPP_ON   -  Drive Vpp high to the previously set voltage.
+;
+;     VPP_SETV -  Set the voltage Vpp for next time Vpp is enabled.
+;                 REG0 contains new voltage with 0-255 mapping to 0-20 volts.
+;
+;     VPP_BLIP -  Produce a short positive pulse on Vpp.
+;
+;     Any of the above routines may wait for a while or start a new
+;     wait interval that is still active on return.  These routines must not
+;     be called with a wait interval in progress.
+;
+;     VPP_ABORT - Disables all Vpp output drivers to the extent possible.
+;                 The purpose of this routine is to shut down the Vpp output
+;                 drivers on a voltage fault.  This happens if a wait
+;                 for a specific Vpp voltage expires before the voltage
+;                 reaches the desired value within the error threshold.
+;                 This routine never changes the current wait interval state.
+;
+;   The target chip Vpp line is controlled by 3 outputs from this processor.
+;   These are:
+;
+;     VPPPWM  -  PWM output that controls the Vpp analog level.  0-100% duty
+;       cycle maps to 0 to 13.89 volts.
+;
+;     VPPON  -  Enables Vpp high side driver, which attempts to drive it up
+;       to the level indicated by the PWM duty cycle of VPPPWM.
+;
+;     VPPDRAIN  -  Enables low side drain.
+;
+;     If both VPPON and VPPDRAIN are off (low), then the Vpp output line is
+;     at high impedence regardless of VPPPWM.
+;
+;   The hardware PWM output is automatically updated next base clock tick
+;   from the PWM2H:PWM2L value when FLAG_PWM2 is set.  FLAG_PWM2 is reset
+;   automatically when the hardware PWM value is updated.  PWM2H and PWM2L
+;   contain the 10 bit hardware PWM value in the format ready for the
+;   hardware.  PWM2H is the upper 8 bits of the 10 bit value and will be
+;   written directly to the CCPR2L register.  PWM2L is the value ready
+;   to be written to the CCP2CON register, and contains the low 2 PWM
+;   duty cycle bits.
+;
+/include "eusb.ins.aspic"
+
+         extern_flags        ;declare global flag bits EXTERN
+;
+;*******************************************************************************
+;
+;   Configuration constants.
+;
+/const   wvppon  real = 50   ;max mS to wait for next operation after Vpp on
+/const   wvppzero real = 50  ;max mS to wait for next operation after Vpp to zero
+/const   decayms real = 250  ;mS for internal voltage to settle after PWM value change
+lbank    equ     1           ;register bank for the local state of this module
+/const   vppdef  real = 13.0 ;Vpp default volts
+/const   vppmax  real = 13.893 ;Vpp volts at 100% PWM duty cycle
+
+ccp2conv equ     b'00001100' ;CCP2CON value with low duty cycle bits 0
+                 ; XX------  unimplemented
+                 ; --00----  duty cycle fraction bits, will be merged in as needed
+                 ; ----1100  select PWM mode
+;
+;   Derived constants.
+;
+lbankadr equ     bankadr(lbank) ;address within local state register bank
+;
+;   Symbolic constants for the current Vpp state.  None of these have the
+;   value 0, which can be used to force explicit setting of the output state
+;   next call.
+;
+vppsof   equ     1           ;current vpp state is OFF (high impedence)
+vppsze   equ     2           ;current vpp state is driving low to ground
+vppson   equ     3           ;current vpp state is driving high to VPPVAL value
+;
+;*******************************************************************************
+;
+;   Global state.  All this state is assumed to be in the GBANK register
+;   bank by other modules.
+;
+         defram  gbankadr
+
+pwm2h    res     1           ;high 8 bits for PWM 1 next interrupt
+pwm2l    res     1           ;full CCP2CON value with low 2 PWM bits
+
+         global  pwm2h, pwm2l
+;
+;*******************************************************************************
+;
+;   Local state.
+;
+         defram  lbankadr
+
+vppst    res     1           ;ID for current Vpp state, use VPPSxx constants
+vppval   res     1           ;0-255 Vpp voltage for Vpp On state, maps to 0-20V
+
+
+.vpp     code
+;
+;*******************************************************************************
+;
+;   Local subroutine VPP_SETPWM
+;
+;   Set the Vpp PWM output to match the voltage indicated by VPPVAL.  The
+;   0-255 value in VPPVAL maps to 0-20V, although this hardware can only
+;   realize a value up to VPPMAX.  Vpp will be driven to its maximum
+;   value when VPPVAL indicates a voltage of VPPMAX or above.
+;
+;   This routine will also start a wait for the internal Vpp drive voltage
+;   to settle if the value is changed.  Nothing is done if the internal
+;   voltage is already set to the requested value or FLAG_VPPNEW is not
+;   set.  FLAG_VPPNEW will always be cleared when this routine returns.
+;
+/const   pwmmaxs integer = [* pwmmax 64] ;max PWM value left justified in 16 bit integer
+/const   vppmult integer = [rnd [/ [* 20 pwmmaxs] [* 255 vppmax]]] ;scale to make PWM
+/const   inmax   integer = [trunc [/ pwmmaxs vppmult]] ;max valid input value
+
+         locsub  vpp_setpwm, regf1 | regf2
+;
+;   Check for VPPVAL has not changed since last time.  FLAG_VPPNEW is set
+;   whenever VPPVAL is changed.
+;
+         dbankif gbankadr
+         btfss   flag_vppnew ;desired voltage has changed ?
+         jump    setpleave   ;no, nothing more to do
+         bcf     flag_vppnew ;indicate hardware will be up to date with VPPVAL
+;
+;   Check for the input value represents a greater voltage than we can
+;   produce.  In that case just set the PWM to 100% duty cycle.
+;
+         dbankif lbankadr
+         movf    vppval, w   ;get the new desired Vpp voltage
+         sublw   [chars inmax] ;compare to largest non-max value
+         skip_wgt            ;above max value ?
+         jump    belmax      ;below max, skip this section
+         ;
+         ;   Set PWM to maximum.
+         ;
+         dbankif gbankadr
+         movlw   [chars pwmmax] >> 2 ;set integer part
+         movwf   pwm2h
+         movlw   (([chars pwmmax] & 3) << 4) | ccp2conv ;set fraction part
+         movwf   pwm2l
+         jump    newpwm      ;handle new value set in PWM2H,PWM2L
+
+belmax   unbank              ;requested voltage is below maximum possible
+;
+;   Multiply the 8 bit input value by VPPMULT to make the corresponding
+;   PWM value in the high 10 bits of a 16 bit number.  VPPMULT may be
+;   greater than 255, so two multiplies are required.
+;
+         dbankif lbankadr
+         movf    vppval, w   ;get the new voltage in 0-255 scale
+         mullw   low [chars vppmult] ;multiply by the low byte of the constant
+         movff   prodl, reg1 ;save the result in REG2:REG1
+         movff   prodh, reg2
+         mullw   high [chars vppmult] ;multiply by the high byte
+         movf    prodl, w    ;add contribution from this multiply
+         addwf   reg2, w
+         ;
+         ;   The result of the input value times VPPMULT is in W:REG1.
+         ;   The new PWM value is in the high 10 bits.  This means the
+         ;   8 bit integer part is in W and the 2 bit fraction part is
+         ;   in the high bits of REG1.
+         ;
+         dbankif gbankadr
+         movwf   pwm2h       ;set new integer part of PWM
+         rrcf    reg1        ;position fraction for field in CCP2CON
+         rrcf    reg1, w
+         andlw   b'00110000' ;mask in only the PWM fraction bits
+         iorlw   ccp2conv    ;merge in remaining CCP2CON static bits
+         movwf   pwm2l       ;set new fraction part of PWM
+
+newpwm   dbankis gbankadr    ;PWM2H,PWM2L and VPPVAL have been updated
+         bsf     flag_pwm2   ;indicate to update hardware PWM next timer tick
+         startwait decayms   ;start wait for internal voltage to settle to new value
+
+setpleave unbank             ;common exit point
+
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VPP_INIT
+;
+;   Initialize the hardware and software state managed by this module.
+;
+         glbsub  vpp_init, noregs
+;
+;   Set up CCP2 module in PWM mode.
+;
+         dbankif ccpr2l
+         clrf    ccpr2l      ;init the duty cycle high bits to zero
+
+         dbankif ccp2con
+         movlw   ccp2conv
+         movwf   ccp2con     ;configure CCP2 for PWM, low duty cycle bits 0
+;
+;   Set PWM2H,PWM2L to produce the default voltage and set the flag so these
+;   get written to the hardware on the first clock tick interrupt.
+;
+/const   pwmdef  integer = [rnd [* [/ vppdef vppmax] pwmmax]] ;10 bit PWM for default voltage
+
+         dbankif gbankadr
+         movlw   [chars pwmdef] >> 2
+         movwf   pwm2h
+         movlw   (([chars pwmdef] << 4) & b'00110000') | ccp2conv
+         movwf   pwm2l
+         bsf     flag_pwm2
+;
+;   Init local state.
+;
+/const   def8b   integer = [rnd [* [/ vppdef 20.0] 255]] ;8 bit 0-20V value for default voltage
+
+         dbankif lbankadr
+         movlw   vppsof      ;init to Vpp state is OFF
+         movwf   vppst
+         movlw   [chars def8b] ;indicate Vpp voltage setting if were ON
+         movwf   vppval
+
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VPP_OFF
+;
+;   Set the Vpp line to high impedence to the extent possible.
+;
+         glbsub  vpp_off, noregs
+
+         dbankif lbankadr
+         movlw   vppsof      ;get ID for desired state
+         xorwf   vppst       ;compare to current state
+         movwf   vppst       ;make sure indicating new state
+         skip_nz             ;state is being changed ?
+         jump    off_leave   ;no, nothing more to do
+
+         dbankif vppon_reg
+         bcf     vppon_pinlat ;disable the high side driver
+         dbankif vppdrain_reg
+         bcf     vppdrain_pinlat ;disable the low side driver
+
+         startwait 0         ;give drivers a short time to be fully off
+;
+;   Start the internal voltage settling to a new value if the Vpp voltage
+;   was changed but not yet updated in the hardware because Vpp was still
+;   being driven.
+;
+         dbankif gbankadr
+         bcf     flag_vppon  ;indicate Vpp is off
+         btfss   flag_vppnew ;a Vpp voltage change is pending ?
+         jump    off_leave   ;no, nothing more to do
+         mcall   vpp_setpwm  ;update the PWM for the new voltage
+
+off_leave unbank
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VPP_ZERO
+;
+;   Drive the Vpp line actively low to the extent possible.
+;
+         glbsub  vpp_zero, regf0 | regf1
+
+         dbankif lbankadr
+         movlw   vppsze      ;get ID for desired state
+         xorwf   vppst       ;compare to current state
+         movwf   vppst       ;make sure indicating new state
+         skip_nz             ;state is being changed ?
+         jump    zero_leave  ;no, nothing more to do
+
+         dbankif vppon_reg
+         bcf     vppon_pinlat ;disable the high side driver
+         waitus  5, 0        ;wait a short time for high side driver off
+         dbankif vppdrain_reg
+         bsf     vppdrain_pinlat ;turn on the low side driver
+         dbankif gbankadr
+         bcf     flag_vppon  ;indicate Vpp is off
+
+         mcall   vpp_setpwm  ;make sure PWM is at latest desired voltage
+         dbankif gbankadr
+         btfss   flag_done   ;no wait interval already in progress ?
+         jump    zero_leave  ;already in wait, don't start a new one
+
+         startwait wvppzero  ;set max allowed mS for line to go low
+         loadk16 reg0, 300   ;mV center value to wait for
+         gcall   wait_vpp    ;indicate waiting for Vpp to get to desired level
+
+zero_leave unbank
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VPP_ON
+;
+;   Drive the Vpp line high to the currently set Vpp ON voltage.
+;
+/const   vppmv   integer = [rnd [/ 40000 255]] ;VPPVAL to mV scale with 1 fraction bit
+
+         glbsub  vpp_on, regf0 | regf1
+
+         dbankif lbankadr
+         movlw   vppson      ;get ID for desired state
+         xorwf   vppst       ;compare to current state
+         movwf   vppst       ;make sure indicating new state
+         skip_nz             ;state is being changed ?
+         jump    on_leave    ;no, nothing more to do
+
+         mcall   vpp_setpwm  ;make sure hardware is updated to the latest voltage
+         gcall   wait_wait   ;wait for the internal voltage to stabalize
+
+         dbankif vppdrain_reg
+         bcf     vppdrain_pinlat ;set low side driver off
+         waitus  1, 0        ;wait to make sure low side driver off
+         dbankif vppon_reg
+         bsf     vppon_pinlat ;enable the high side driver
+         dbankif gbankadr
+         bsf     flag_vppon  ;indicate Vpp is on
+
+         mcall   vpp_setpwm  ;make sure PWM is at latest desired voltage
+         dbankif gbankadr
+         btfss   flag_done   ;no wait interval already in progress ?
+         jump    on_leave    ;already in wait, don't start a new one
+
+         startwait wvppon    ;set max allowed mS for line to go high
+         dbankif lbankadr
+         movf    vppval, w   ;get the voltage setting
+         mullw   [chars vppmv] ;make millivolts with 1 fraction bit
+         bcf     status, c   ;init bit to shift in
+         rrcf    prodh, w    ;shift right 1 bit to make mV in REG1:REG0
+         movwf   reg1
+         rrcf    prodl, w
+         movwf   reg0
+         gcall   wait_vpp    ;indicate waiting for Vpp to get to desired level
+
+on_leave unbank
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VPP_SETV
+;
+;   Set the new Vpp on voltage to the value in REG0.  The 0-255 value in
+;   REG0 maps to 0-20 volts, although this hardware can't realize the full
+;   range.  The new setting will only take effect the next time Vpp is
+;   transitioned to on.
+;
+         glbsub  vpp_setv, noregs
+;
+;   Check for Vpp level is not being changed.
+;
+         dbankif lbankadr
+         movf    reg0, w     ;get the new setting
+         xorwf   vppval, w   ;compare to the current value
+         skip_nz             ;setting is being changed ?
+         jump    setv_leave  ;no, nothing more to do
+;
+;   Update the desired level and flag it as changed.
+;
+         movff   reg0, vppval ;update desired Vpp voltage level
+         dbankif gbankadr
+         bsf     flag_vppnew ;indicate new Vpp voltage is pending
+;
+;   Don't change the voltage now if Vpp is currently on.
+;
+         dbankif lbankadr
+         movf    vppst, w    ;get ID for the current Vpp state
+         xorlw   vppson      ;compare to ON state
+         skip_nz             ;Vpp is currently off ?
+         jump    setv_leave  ;Vpp is currently on, don't change voltage now
+
+         mcall   vpp_setpwm  ;update internal hardware voltage, start wait
+
+setv_leave unbank
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VPP_ABORT
+;
+;   Shut off any Vpp drive.  This routine is intended to be called when Vpp
+;   has not reached the intended voltage within tolerance when a wait for a
+;   specific Vpp level elapses.
+;
+         glbsub  vpp_abort, noregs
+
+         dbankif vppon_reg
+         bcf     vppon_pinlat ;disable the high side driver
+         dbankif vppdrain_reg
+         bcf     vppdrain_pinlat ;disable the low side driver
+
+         dbankif lbankadr
+         clrf    vppst       ;indicate not in a valid Vpp drive state
+         dbankif gbankadr
+         bcf     flag_vppon  ;indicate Vpp is not on
+
+         leaverest
+;
+;*******************************************************************************
+;
+;   Subroutine VPP_BLIP
+;
+;   Produce a brief pulse on Vpp.  Vpp is assumed to be held low on entry, and
+;   will be held low on exit.
+;
+         glbsub  vpp_blip, noregs
+
+         set_vppdrain_off    ;turn off the low side driver
+         waitns  2000, 1     ;give driver time to turn off
+         intr_off
+         set_vppon_on        ;turn on the high side driver
+         waitns  1000, 1     ;time to leave high side driver on
+         set_vppdrain_on     ;turn on low side driver
+         set_vppon_off       ;turn off the high side driver
+         intr_on
+
+         leaverest
+
+         end
