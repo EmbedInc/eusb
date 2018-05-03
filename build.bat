@@ -1,15 +1,19 @@
 @echo off
 rem
-rem   BUILD_EUSB_EXPIC
+rem   Build the firmware from this source directory.
+
 rem
 rem   Build the EUSB firmware from the PICPRG library.
 rem
 setlocal
+set srcdir=picprg
+set buildname=eusb
 
 call treename_var (cog)source/pic/fwtype.all tnam
 if exist "%tnam%" (
   call src_get pic fwtype.all
   )
+
 call src_get_ins_aspic pic adda
 call src_get_ins_aspic pic fwtype
 call src_get_ins_aspic pic mulu
@@ -23,51 +27,57 @@ call src_get_ins_aspic pic task_setup
 call src_get_ins_aspic pic usb
 call src_get_ins_aspic pic usb0
 
-call src_ins_aspic picprg eusblib -set make_version
-call src_get_ins_aspic picprg eusb
-call src_get_ins_aspic picprg eusb_usb
-call src_get_ins_aspic picprg eusb_usb0
-call src_get_ins_aspic picprg picprg
-call src_get_ins_aspic picprg picprg_cmd
-call src_get_ins_aspic picprg picprg_core12
-call src_get_ins_aspic picprg picprg_f16
-call src_get_ins_aspic picprg picprg_f16e
-call src_get_ins_aspic picprg picprg_f18
-call src_get_ins_aspic picprg picprg_f30
-call src_get_ins_aspic picprg picprg_name
-call src_get_ins_aspic picprg picprg_op
-call src_get_ins_aspic picprg picprg_prom
-call src_get_ins_aspic picprg picprg_sert
+call src_ins_aspic %srcdir% %buildname%lib -set make_version
+call src_get_ins_aspic %srcdir% %buildname%
+call src_get_ins_aspic %srcdir% %buildname%_usb
+call src_get_ins_aspic %srcdir% %buildname%_usb0
 
-call src_aspic picprg eusb_ad
-call src_aspic picprg eusb_adda
-call src_aspic picprg eusb_cmd
-call src_aspic picprg eusb_core12
-call src_aspic picprg eusb_f16
-call src_aspic picprg eusb_f16e
-call src_aspic picprg eusb_f18
-call src_aspic picprg eusb_f30
-call src_aspic picprg eusb_init
-call src_aspic picprg eusb_intr
-call src_aspic picprg eusb_led
-call src_aspic picprg eusb_main
-call src_aspic picprg eusb_mulu
-call src_aspic picprg eusb_name
-call src_aspic picprg eusb_op
-call src_aspic picprg eusb_port
-call src_aspic picprg eusb_prom
-call src_aspic picprg eusb_regs
-call src_aspic picprg eusb_sert
-call src_aspic picprg eusb_stack
-call src_aspic picprg eusb_task
-call src_aspic picprg eusb_uart
-call src_aspic picprg eusb_usb
-call src_aspic picprg eusb_usb0
-call src_aspic picprg eusb_vdd
-call src_aspic picprg eusb_vpp
-call src_aspic picprg eusb_wait
+call src_get_ins_aspic %srcdir% pprog picprg
+call src_get_ins_aspic %srcdir% pprog picprg_cmd
+call src_get_ins_aspic %srcdir% pprog picprg_core12
+call src_get_ins_aspic %srcdir% pprog picprg_f16
+call src_get_ins_aspic %srcdir% pprog picprg_f16e
+call src_get_ins_aspic %srcdir% pprog picprg_f18
+call src_get_ins_aspic %srcdir% pprog picprg_f30
+call src_get_ins_aspic %srcdir% pprog picprg_name
+call src_get_ins_aspic %srcdir% pprog picprg_op
+call src_get_ins_aspic %srcdir% pprog picprg_prom
+call src_get_ins_aspic %srcdir% pprog picprg_sert
 
-call src_libpic picprg eusb
+call src_aspic %srcdir% %buildname%_ad
+call src_aspic %srcdir% %buildname%_adda
+call src_aspic %srcdir% %buildname%_cmd
+call src_aspic %srcdir% %buildname%_core12
+call src_aspic %srcdir% %buildname%_f16
+call src_aspic %srcdir% %buildname%_f16e
+call src_aspic %srcdir% %buildname%_f18
+call src_aspic %srcdir% %buildname%_f30
+call src_aspic %srcdir% %buildname%_init
+call src_aspic %srcdir% %buildname%_intr
+call src_aspic %srcdir% %buildname%_led
+call src_aspic %srcdir% %buildname%_main
+call src_aspic %srcdir% %buildname%_mulu
+call src_aspic %srcdir% %buildname%_name
+call src_aspic %srcdir% %buildname%_op
+call src_aspic %srcdir% %buildname%_port
+call src_aspic %srcdir% %buildname%_prom
+call src_aspic %srcdir% %buildname%_regs
+call src_aspic %srcdir% %buildname%_sert
+call src_aspic %srcdir% %buildname%_stack
+call src_aspic %srcdir% %buildname%_task
+call src_aspic %srcdir% %buildname%_uart
+call src_aspic %srcdir% %buildname%_usb
+call src_aspic %srcdir% %buildname%_usb0
+call src_aspic %srcdir% %buildname%_vdd
+call src_aspic %srcdir% %buildname%_vpp
+call src_aspic %srcdir% %buildname%_wait
 
-call src_aspic picprg eusb_strt
-call src_expic picprg eusb
+call src_libpic %srcdir% %buildname%
+
+call src_aspic %srcdir% %buildname%_strt
+call src_expic %srcdir% %buildname%
+
+rem   Do SRC_GET on files just so that promotion is performed when enabled.
+rem
+src_get %srcdir% doc.txt
+src_get %srcdir% build.bat

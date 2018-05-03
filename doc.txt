@@ -1,0 +1,271 @@
+                       USBProg Programmer EUSB Firmware
+                             21 December 2016
+
+This document describes the outside view of the EUSB firmware within the
+USBProg PIC programmer.
+
+
+Firwmare versions
+
+  EUSB 1, 4 February 2006
+
+    Seems to work fully via serial interface.  USB not implemented yet,
+    but can be powered from USB and communicate over serial.  Contains
+    same PIC support as ProProg firmware PPRG 24 which was used as the
+    base. Contains additional features made possible by this programmer
+    hardware, like variable Vpp.  CPU runs at 48MHz, DSETNS = 500, DSETTNS
+    = 1000.  Programming a full 30F4011 takes 40.4 seconds.
+
+  EUSB 2, 7 February 2006
+
+    Fixed CLKOPC constant in UART module to be 80 instead of the 10
+    accidentally left in last time for debugging.  This is the percent of
+    the time from the start bit to the stop bit to time out in. After the
+    timeout, if TXREG was empty on entry to the routine new writes are
+    held off until TRMT becomes true.
+
+  EUSB 3, 12 February 2006
+
+    Temporary version to show the UART null byte output bug.  Only the
+    UART_PUT routine was changed to remove the logic to work around the
+    bug.  This version just waits for TXIF and writes the byte, and
+    exhibits the null byte symptom.  This version of the source code was
+    given to Microchip as a test case, although it probably won't be much
+    help.
+
+  EUSB 4, 12 February 2006
+
+    Same as version 2 except the unused UART output FIFO was removed. No
+    functional changes from version 2 since the UART output FIFO was not
+    used.
+
+  EUSB 5, 3 June 2006
+
+    Updated to EUSB2 board.  Some functions were moved to different I/O
+    pins from the EUSB1 board.  Added switches in the project include file
+    to disable USB, disable UART command input, and enable echoing USB
+    enumeration requests over the serial port.
+
+    Added general USB driver and enpoint 0 handler.  USB unumeration seems
+    to work.  Very likely there is a bug in getting or sending data via
+    the bulk endpoint 1.  There is also likely a bug where interrupts are
+    corrupting USB enumeration response data.  Although the USB code has
+    been tested, it is disabled in this version.
+
+    This firmware now enables the switching power supplies.  The switching
+    power supplies are started in the INIT module after the individual
+    modules have been initialized.
+
+    This version acts as a fully functional RS-232 programmer.  Uses 48MHz
+    main oscillator frequency.  The following programming times in seconds
+    were measured:
+
+        PIC   Empty    Full
+    -------   -----   -----
+     16F876    15.6    51.8
+     18F252    14.9    23.1
+    18F2520    10.0    16.4
+    30F3013    17.8    25.4
+    30F4012    33.1    46.5
+
+  EUSB 6, 4 June 2006
+
+    For USB driver testing only.  Enumerates normally on USB, then copies
+    any bytes received from endpoint 1 back to endpoint 1 unaltered.
+    Received USB bytes are also echoed out the UART.  UART input is
+    ignored.  PIC programmer function exists but there is no way to send
+    it commands.
+
+  EUSB 7, 11 June 2006
+
+    Same as version 6 except fixed bug where USB output byte sometimes got
+    corrupted.  Still contains workaround in USB0 to disable interrupts
+    around processing a setup request.  Doesn't enumerate properly if
+    interrupts are left on although it should.  Endpoint 1 input bytes are
+    just echoed to endpoint 1 output.  The PIC programmer code is present
+    but there is no way to send it commands. This version is for USB
+    testing only.
+
+  EUSB 8, 8 July 2006
+
+    Implemented USB communication to the programmer functions for real.
+    Bug fixed in enumeration where a byte sometimes got corrupted.  The
+    workaround to disable interrupts around setup responses has been
+    removed and all appears to work correctly.  USB endpoint 1 I/O is
+    connected to programmer command processor and appears to work
+    correctly, although this was tested only with low level test program
+    that sends individual bytes manually and displays the raw received
+    bytes.  Implements protocol spec version 20.
+
+  EUSB 9, 6 August 2006
+
+    Fixed bug in command processor where a byte was sometimes pushed onto
+    the data stack without being popped if the input was coming from the
+    USB.  USB programming is fully functional, although the programmer
+    name and other non-volatile settings have not been implemented yet.
+    The programmer name string always returns "This is a test" in this
+    version.
+
+    Readback from a target is significantly slower than the same
+    operations performed over the serial port.  This is most likely due to
+    sending then waiting to receive small amounts of data.  Writing large
+    blocks of data (which requires no readback) to a 18F2520 was 11%
+    faster than via the serial port.
+
+  EUSB 10, 24 September 2006
+
+    Added NAMESET and NAMEGET commands.  Non-volatile user-defined name
+    not yet return for USB setup string 1.
+
+  EUSB 11, 1 October 2006
+
+    USB setup string 1 now returns the non-volatile user definable name.
+    This allows the host driver to get and report the names of all
+    USBProgs on the USB whether in use or not.  Implements protocol spec
+    version 20.
+
+  EUSB 12, 13 October 2006
+
+    Moved the executable code of the NAME and PROM modules into included
+    files, which are now also used by the PPRG firmware. Added REBOOT
+    command.  Implements protocol spec version 21.
+
+  EUSB 13, 16 October 2006
+
+    Added READ64 command.  Readback via USB is now almost as fast and
+    sometimes even faster than via the serial port.
+
+  EUSB 14, 25 January 2007
+
+    Fixed bug that could cause hang on writing config word of 16F8xxA.
+
+  EUSB 15, 27 January 2007
+
+    Fixed device name and manufacturer name strings to be sent as Unicode
+    instead of ASCII.
+
+  EUSB 16, 27 January 2007
+
+    Fixed bug where Vdd level might not be right until after first time
+    Vdd is set to OFF from being something else.
+
+  EUSB 17, 19 February 2007
+
+    Added write ID 11, which is for 16F88x.  Implements protocol spec
+    version 23.  Fixed bug where initialization of dsPIC target could have
+    proceeded before Vpp had reached its final level.  Did not cause
+    erroneous behaviour due to workaround in host software.  New versions
+    of the host software do not have this workaround and therefore require
+    this version or later.
+
+  EUSB 18, 20 January 2008
+
+    Added reset ID 6, which supports 18FJ PICs like the 18F25J10. Added
+    routine for generating a short blip on Vpp, as required by the reset
+    procedure for the 18FJ devices.
+
+  EUSB 19, 23 February 2008
+
+    Changed timeout for waiting for Vpp to stabalize after voltage level
+    change.  Was 100mS, now 300mS.
+
+  EUSB 20, 2 May 2008
+
+    Added reset ID 7, which supports dsPIC 24H and 33F.  Supports protocol
+    spec 25.  Enhanced dsPIC reading and writing algorithms to support 24H
+    and 33F.  The reset algorithm for 30F (ID 4) was changed so that the
+    initial GOTO 100h is performed as part of the reset.  The new 24H and
+    33F reset algorithm (ID 7) also does the initial GOTO.
+
+  EUSB 21, 14 Feb 2009
+
+    Special version that guarantees 5uS setup and hold time with respect
+    to the falling edge of PGC.  This is a one-off version for special
+    target hardware, and runs much slower than necessary for normal target
+    hardware.
+
+  EUSB 22, 22 Nov 2009
+
+    Normal version.  Added support for 24F devices, including the new
+    reset ID 8.
+
+  EUSB 23 seq 11, 4 Jan 2011
+
+    Added support for 16F182x.
+
+  EUSB 24 seq 7, 19 Oct 2011
+
+    Added support for 24FJ parts.  Fixed problem with 16F182x code.
+
+  EUSB 25 seq 3, 1 Mar 2013
+
+    One-off version that implements a slower 16F182x reset algorithm. This
+    was done to make the programmer work with a particular piece of
+    hardware that did not provide direct connections to the PIC lines, and
+    the extra hardware was interfering.  In this version, a extra 400 ms
+    wait is added after power up so that a reset supervisor chip allows
+    MCLR to be driven high.  Then a 1 ms pulse on MCRL is done to put the
+    processor in reset state ready to have the programming mode signature
+    clocked in, regardless of what may have happened to PGC and PGD when
+    power was applied.
+
+    This version will function when the programmer is connected to all the
+    programming lines normally, but will be slower.  It is not recommended
+    for general use.
+
+  EUSB 26 seq 15, 6 Feb 2015
+
+    Added support for 18FxxK80.  Added serial protocol commands EECON1,
+    EEADR, EEADRH, and EEDATA.  Added reset ID 11, which is the high
+    voltage program entry mode for the 18FxxK80.  Updated to new USB
+    subsystem include file scheme.  Same base source files as firmware
+    LPRG 14.
+
+  EUSB 27 seq 9, 12 Oct 2015
+
+    Added support of non-volatile data memory for 12 bit core devices.
+    DATADR must now be set for 12 bit core devices that have data memory.
+
+  EUSB 28 seq 4, 24 Feb 2016
+
+    Updated to protocol spec version 29.7, which adds support for 24/33 EP
+    series parts.  This included adding reset ID 12, making addresses of
+    various target registers configurable, and implementing the "fast
+    tick" mechanism.
+
+    Fast ticks are implemented as instruction cycles.  In this version,
+    fast ticks are only used to time the wait after programming 2 words in
+    a 24/33 EP series target PIC.
+
+    IDRESET now causes various configurations to be reset to default.
+
+    Same common code as LProg firmware LPRG 15.
+
+  EUSB 29 seq 4, 14 Dec 2016
+
+    Added ability to use the UART as a separate data port, controllable
+    via the new commands SENDSER and RECVSER.  The new build switch
+    CMDUART enables the UART as a host command source, versus available as
+    a dataport.  The UART receive buffer was increased from 32 bytes to
+    253 bytes.  When used as a data port, this is the number of received
+    bytes the unit can store before additional received bytes are lost.
+    This is 22 ms of data when there are no gaps between bytes.
+
+    In this version, the UART is used as a data port, and can not receive
+    host commands.
+
+  EUSB 30 seq 1, 21 Dec 2016
+
+    Fixed bugs in SENDSER and RECVSER commands.  These now delay their
+    operation until any wait interval in progress elapses.
+
+    In this version, the UART is used as a data port, and can not receive
+    host commands.
+
+  EUSB 31 seq 1, 28 Dec 2016
+
+    Enabled the VPPHIZ command.  This was disabled in previous versions
+    for some reason.
+
+  EUSB 32
+
