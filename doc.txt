@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                             21 December 2016
+                                11 May 2017
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -267,5 +267,7 @@ Firwmare versions
     Enabled the VPPHIZ command.  This was disabled in previous versions
     for some reason.
 
-  EUSB 32
+  EUSB 32 seq 12, 11 May 2018
 
+    Updated to use new version of common PICPRG_F16E.INS.ASPIC library
+    file with minor bug fix.
