@@ -17,12 +17,12 @@
 ;   This include file sets up the environment for the EUSB firmware.
 ;
 /const   picname = "18F2550" ;specific PIC model name
-/const   fwname  = "eusb"    ;name of this project
 /const   srcdir  = "picprg"  ;SOURCE directory containing this project
+/const   buildname = "eusb"  ;name of this project
 /const   fwtype  integer = 2 ;ID for this firmware
 
-/include "(cog)src/pic/fwtype.ins.aspic"
 /include "(cog)src/pic/std_def.ins.aspic"
+/include "(cog)src/pic/fwtype.ins.aspic"
 ;
 ;   Set configuration for the standard routines and macros.  The stack
 ;   location and size has been set to default by the STD_DEF include
