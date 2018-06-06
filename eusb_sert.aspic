@@ -28,19 +28,19 @@
 /include "eusb.ins.aspic"
 
          extern_flags        ;declare global flag bits EXTERN
-;
+
 ;*******************************************************************************
 ;
 ;   Configuration constants.
 ;
-tmin     equ     500         ;nS minimum any changes either side of falling clock
-compns   equ     300         ;nS comparator maximum response time
+tmin     equ     500         ;ns minimum any changes either side of falling clock
+compns   equ     300         ;ns comparator maximum response time
 lbank    equ     1           ;register bank for the local state of this module
 ;
 ;   Derived constants.
 ;
 lbankadr equ     bankadr(lbank) ;address within local state register bank
-;
+
 ;*******************************************************************************
 ;
 ;   Global state.  All this state is assumed to be in the GBANK register
@@ -48,7 +48,7 @@ lbankadr equ     bankadr(lbank) ;address within local state register bank
 ;
          defram  gbankadr
 
-;
+
 ;*******************************************************************************
 ;
 ;   Local state.
@@ -56,7 +56,7 @@ lbankadr equ     bankadr(lbank) ;address within local state register bank
          defram  lbankadr
 
 .sert    code
-;
+
 ;*******************************************************************************
 ;
 ;   Macro PGC_LOW cy
@@ -72,7 +72,7 @@ pgc_low  macro   cy
          andlw   ~(1 << pgchi_bit)
          movwf   pgclo_lat
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Macro PGC_HIGH cy
@@ -88,7 +88,7 @@ pgc_high macro   cy
          andlw   ~(1 << pgclo_bit)
          movwf   pgclo_lat
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Macro PGC_OFF cy
@@ -102,7 +102,7 @@ pgc_off  macro   cy
          movlw   ~((1 << pgclo_bit) | (1 << pgchi_bit))
          andwf   pgclo_lat
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Macro PGD_LOW cy
@@ -118,7 +118,7 @@ pgd_low  macro   cy
          andlw   ~(1 << pgdhi_bit)
          movwf   pgdlo_lat
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Macro PGD_HIGH cy
@@ -134,7 +134,7 @@ pgd_high macro   cy
          andlw   ~(1 << pgdlo_bit)
          movwf   pgdlo_lat
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Macro PGD_OFF cy
@@ -148,7 +148,7 @@ pgd_off  macro   cy
          movlw   ~((1 << pgdlo_bit) | (1 << pgdhi_bit))
          andwf   pgdlo_lat
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Macro SKIP_PGDHI cy
@@ -161,7 +161,7 @@ skip_pgdhi macro cy
          dbankif cmcon
          btfss   cmcon, 6
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Macro SKIP_PGDLO cy
@@ -174,7 +174,7 @@ skip_pgdlo macro cy
          dbankif cmcon
          btfsc   cmcon, 6
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Subroutine SERT_INIT
@@ -197,7 +197,7 @@ skip_pgdlo macro cy
          movwf   cmcon
 
          leaverest
-;
+
 ;*******************************************************************************
 ;
 ;   Subroutine SERT_TEST_TDRIVE
@@ -241,7 +241,7 @@ done_tdrive unbank           ;FLAG_TDRIVE all set, clean up and leave
          bsf     pgdd_tris, pgdd_bit ;turn off weak PGD drive
 
          leaverest
-;
+
 ;*******************************************************************************
 ;
 ;   Include the standard serial interface routines that are not dependent on

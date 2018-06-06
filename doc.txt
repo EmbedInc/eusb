@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                                11 May 2017
+                                6 June 2018
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -271,3 +271,12 @@ Firwmare versions
 
     Updated to use new version of common PICPRG_F16E.INS.ASPIC library
     file with minor bug fix.
+
+  EUSB 33 seq 23, 6 Jun 2018
+
+    Added support for the new 16F programming algorithm that uses 8 bit
+    opcodes and transfers all data in 24 bit words.  Added the 16FB module
+    for that purpose.
+
+    The 16F15313 is one example of a part that uses this programming
+    protocol.

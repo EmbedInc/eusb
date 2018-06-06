@@ -695,8 +695,8 @@ tbl_cmd                      ;jump table for top level commands
          tblent  49, highz   ;set all target lines to high impedence
 ;        tblent  50, ntout   ;disable host command stream timeout
          tblent  51, getcap  ;return info about a particular capability
-         tblent  52, send3   ;send up to 24 data bits to the targer
-         tblent  53, send4   ;send up to 32 data bits to the targer
+         tblent  52, send3   ;send up to 24 data bits to the target
+         tblent  53, send4   ;send up to 32 data bits to the target
          tblent  54, recv3   ;receive up to 24 data bits from the target
          tblent  55, recv4   ;receive up to 32 data bits from the target
          tblent  56, w30pgm  ;write 4 program memory words to dsPIC target
@@ -733,6 +733,10 @@ tbl_cmd                      ;jump table for top level commands
          tblent  85, sendser ;send bytes over separate serial port
          tblent  86, recvser ;receive bytes from separate serial port
   /endif
+
+         tblent  87, send8m  ;send 8 bits, MSB first
+         tblent  88, send24m ;send 24 bits, MSB first
+         tblent  89, recv24m ;receive 24 bits, MSB first
 
 tbl_cmd_n equ    next_opc    ;number of last implemented table entry
 
@@ -959,6 +963,7 @@ captbl_read
          db      1           ;4 - dsPIC
          db      1           ;5 - 18F, program and data space
          db      1           ;6 - enhanced (4 digit) 16F
+         db      1           ;7 - new 16F with 8 bit opcodes, like 16F15313
 captbl_read_end
 ;
 ;   List of implemented write IDs.  IDs 0-3 are implemented by default, so these
@@ -980,6 +985,7 @@ captbl_write
          db      1           ;10 - 16F77, BEGIN PROG 8, END PROG 14
          db      1           ;11 - 16F88x, BEGIN PROG 24, END PROG 10
          db      1           ;12 - 16F182x, BEGIN 24 END 10, config: BEGIN 8
+         db      1           ;13 - 8 bit programming opcodes, like 16F15313
 captbl_write_end
 ;
 ;   Vpp limits.  Entry 0 is the minimum Vpp level and entry 1 the maximum

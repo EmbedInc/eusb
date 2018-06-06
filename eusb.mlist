@@ -3,6 +3,7 @@ eusb_adda.o
 eusb_cmd.o
 eusb_core12.o
 eusb_f16.o
+eusb_f16b.o
 eusb_f16e.o
 eusb_f18.o
 eusb_f30.o

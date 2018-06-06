@@ -36,6 +36,7 @@ call src_get_ins_aspic %srcdir% pprog picprg
 call src_get_ins_aspic %srcdir% pprog picprg_cmd
 call src_get_ins_aspic %srcdir% pprog picprg_core12
 call src_get_ins_aspic %srcdir% pprog picprg_f16
+call src_get_ins_aspic %srcdir% pprog picprg_f16b
 call src_get_ins_aspic %srcdir% pprog picprg_f16e
 call src_get_ins_aspic %srcdir% pprog picprg_f18
 call src_get_ins_aspic %srcdir% pprog picprg_f30
@@ -49,6 +50,7 @@ call src_aspic %srcdir% %buildname%_adda
 call src_aspic %srcdir% %buildname%_cmd
 call src_aspic %srcdir% %buildname%_core12
 call src_aspic %srcdir% %buildname%_f16
+call src_aspic %srcdir% %buildname%_f16b
 call src_aspic %srcdir% %buildname%_f16e
 call src_aspic %srcdir% %buildname%_f18
 call src_aspic %srcdir% %buildname%_f30
