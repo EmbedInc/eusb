@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                                6 June 2018
+                              22 October 2018
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -280,3 +280,7 @@ Firwmare versions
 
     The 16F15313 is one example of a part that uses this programming
     protocol.
+
+  EUSB 34 seq 43, 22 Oct 2018
+
+    Added support for 16F183xx.  This was tested with a 16F18346.

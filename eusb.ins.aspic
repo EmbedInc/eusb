@@ -24,6 +24,7 @@
 ;
 /const   debug_icd bool = false ;build for debugging with ICD, RealIce, etc
 /const   debug   bool = false ;build for any kind of debugging
+/const   debug_cmduart = false ;send programming command out the data UART
 ;
 ;   Debug switches.  The normal production mode for all the MPASM switches
 ;   is 0.  A value of 1 enables the debugging function unless otherwise
@@ -48,7 +49,7 @@ info_info equ    0           ;private 32 bit information about this firmware
 /const   pwminst integer = 250 ;instruction cycles in PWM period
 /const   tickinst integer = 1000 ;instruction cycles per base clock tick
 /const   reset_slow bool = false ;use slower reset, non-standard hardware workaround
-/const   cmduart bool = false ;UART is not source of host command stream
+/const   cmduart bool = [and false [not debug_cmduart]] ;UART is commands source
 gbankadr equ     0           ;adr within globals bank (access bank on PIC18)
 to_hostms equ    250         ;10-2500 mS indicate host communication after receive
 to_tronms equ    250         ;10-2500 mS indicate target on since last on
