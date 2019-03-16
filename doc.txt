@@ -13,8 +13,8 @@ Firwmare versions
     but can be powered from USB and communicate over serial.  Contains
     same PIC support as ProProg firmware PPRG 24 which was used as the
     base. Contains additional features made possible by this programmer
-    hardware, like variable Vpp.  CPU runs at 48MHz, DSETNS = 500, DSETTNS
-    = 1000.  Programming a full 30F4011 takes 40.4 seconds.
+    hardware, like variable Vpp.  CPU runs at 48 MHz, DSETNS = 500,
+    DSETTNS = 1000.  Programming a full 30F4011 takes 40.4 seconds.
 
   EUSB 2, 7 February 2006
 
@@ -35,7 +35,7 @@ Firwmare versions
 
   EUSB 4, 12 February 2006
 
-    Same as version 2 except the unused UART output FIFO was removed. No
+    Same as version 2 except the unused UART output FIFO was removed.  No
     functional changes from version 2 since the UART output FIFO was not
     used.
 
@@ -56,9 +56,9 @@ Firwmare versions
     power supplies are started in the INIT module after the individual
     modules have been initialized.
 
-    This version acts as a fully functional RS-232 programmer.  Uses 48MHz
-    main oscillator frequency.  The following programming times in seconds
-    were measured:
+    This version acts as a fully functional RS-232 programmer.  Uses 48
+    MHz main oscillator frequency.  The following programming times in
+    seconds were measured:
 
         PIC   Empty    Full
     -------   -----   -----
@@ -127,7 +127,7 @@ Firwmare versions
   EUSB 12, 13 October 2006
 
     Moved the executable code of the NAME and PROM modules into included
-    files, which are now also used by the PPRG firmware. Added REBOOT
+    files, which are now also used by the PPRG firmware.  Added REBOOT
     command.  Implements protocol spec version 21.
 
   EUSB 13, 16 October 2006
@@ -160,14 +160,14 @@ Firwmare versions
 
   EUSB 18, 20 January 2008
 
-    Added reset ID 6, which supports 18FJ PICs like the 18F25J10. Added
+    Added reset ID 6, which supports 18FJ PICs like the 18F25J10.  Added
     routine for generating a short blip on Vpp, as required by the reset
     procedure for the 18FJ devices.
 
   EUSB 19, 23 February 2008
 
     Changed timeout for waiting for Vpp to stabalize after voltage level
-    change.  Was 100mS, now 300mS.
+    change.  Was 100 ms, now 300 ms.
 
   EUSB 20, 2 May 2008
 
@@ -179,7 +179,7 @@ Firwmare versions
 
   EUSB 21, 14 Feb 2009
 
-    Special version that guarantees 5uS setup and hold time with respect
+    Special version that guarantees 5 us setup and hold time with respect
     to the falling edge of PGC.  This is a one-off version for special
     target hardware, and runs much slower than necessary for normal target
     hardware.
