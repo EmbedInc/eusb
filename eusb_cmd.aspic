@@ -18,11 +18,11 @@
 ;   the command stream coming from the host computer via the USB and possibly
 ;   the RS-232 link.
 ;
-;   Build switch CMDUART allows commands also come from the UART.  In that case,
-;   the source of the command opcode is saved.  Further bytes are fetched from
-;   the same source until the next opcode.  Response bytes are also sent to the
-;   source that the command opcode byte came from.  When CMDUART is false, the
-;   UART can not be a source of commands, leaving only the USB.
+;   Build switch CMDUART allows commands to also come from the UART.  In that
+;   case, the source of the command opcode is saved.  Further bytes are fetched
+;   from the same source until the next opcode.  Response bytes are also sent to
+;   the source that the command opcode byte came from.  When CMDUART is false,
+;   the UART can not be a source of commands, leaving only the USB.
 ;
 /include "eusb.ins.aspic"
 
@@ -441,10 +441,10 @@ cmd_timeout unbank           ;aborts to here on input stream timeout
 ;   checking multiple sources and dealing with the result is eliminated.
 ;
 ;   If the command byte is received from the UART, then a ACK byte must be sent
-;   in response to receiving the opcode.  Mechanism implements flow control over
-;   a byte stream that is not inherently flow controlled.  Since USB is flow
-;   controlled, no ACK byte is sent.  The ACK byte sending mechanism is also
-;   eliminated when the build switch CMDUART is FALSE.
+;   in response to receiving the opcode.  This mechanism implements flow control
+;   over a byte stream that is not inherently flow controlled.  Since USB is
+;   flow controlled, no ACK byte is sent.  The ACK byte sending mechanism is
+;   also eliminated when the build switch CMDUART is FALSE.
 ;
 /if cmduart then
          dbankif gbankadr
@@ -523,7 +523,6 @@ cmd_haveopc unbank           ;opcode in REG0, FLAG_INUSB set according to input
 
 done_ack unbank              ;done with ACK response byte
   /endif
-
 ;
 ;   Jump to the dispatch routine indicated by the table entry.  Register usage:
 ;
@@ -729,7 +728,7 @@ tbl_cmd                      ;jump table for top level commands
          tblent  83, tprogf  ;fast ticks to wait for programming operation
          tblent  84, ftickf  ;gets fast ticks clock frequency
 
-/if [not cmduart] then
+/if datuart then
          tblent  85, sendser ;send bytes over separate serial port
          tblent  86, recvser ;receive bytes from separate serial port
   /endif

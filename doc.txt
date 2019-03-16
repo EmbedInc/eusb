@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                              22 October 2018
+                                16 March 2019
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -284,3 +284,9 @@ Firwmare versions
   EUSB 34 seq 43, 22 Oct 2018
 
     Added support for 16F183xx.  This was tested with a 16F18346.
+
+  EUSB 35 seq 4, 16 Mar 2019
+
+    Same as EUSB 34, except the UART is configured as a command source.
+    This is required for production of the USBProg or USBProg2 programmers
+    since the tester interacts with the programmer over the UART port.
