@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                                22 August 2021
+                               14 December 2021
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -302,3 +302,8 @@ Firwmare versions
     families.
 
     UART configuration is command source.
+
+  EUSB 37
+
+    Added reset ID 13, which supports low-voltage program mode entry for
+    16F153xx.
