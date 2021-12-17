@@ -39,6 +39,19 @@ clkowin  equ     (byinst * clkopc) / 100 ;instructions from start to danger zone
 clkotmr  equ     65536 - clkowin + 2 ;TMR0 value to overflow at danger zone start
 lbankadr equ     bankadr(lbank) ;address within local state register bank
 
+/block
+  /var local s
+
+  /set s ""
+  /if cmduart
+    /then
+      /append s "UART is command source, not data port."
+    /else
+      /append s "UART is data port, not command source."
+    /endif
+  /show "  " s
+  /endblock
+
 ;*******************************************************************************
 ;
 ;   Global state.  All this state is assumed to be in the GBANK register bank by

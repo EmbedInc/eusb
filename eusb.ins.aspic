@@ -35,7 +35,7 @@ debug_clrusbbuf equ 0        ;clear USB I/O buffers to 0 at startup
 ;
 ;   Application configuration parameters
 ;
-/const   uart_cmdsrc bool = true ;UART is command source, not data port
+/const   uart_cmdsrc bool = false ;UART is command source, not data port
 /const   reset_slow bool = false ;use slower reset, non-standard hardware workaround
 /const   pwminst integer = 250 ;instruction cycles in PWM period
 /const   tickinst integer = 1000 ;instruction cycles per base clock tick
