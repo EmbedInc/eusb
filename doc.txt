@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                               17 December 2021
+                               9 September 2022
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -307,5 +307,15 @@ Firwmare versions
 
     Added reset ID 13, which supports low-voltage program mode entry for
     16F153xx.  Updated to reset tables bug fixed in common code.
+
+    UART is data port, not command source.
+
+  EUSB 38 seq 26, 9 Sep 2022
+
+    Updated to new USB library code structure, which now requires using
+    USB_SETUP.INS.ASPIC.
+
+    Added detection of USB hardware getting wedged.  If so, resets USB,
+    waits 1 second, then resets the processor.
 
     UART is data port, not command source.

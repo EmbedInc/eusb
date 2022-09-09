@@ -17,16 +17,23 @@
 ;   High level interface to the status LED.
 ;
 /include "eusb.ins.aspic"
+         ;
+         ;   Activity indicators.  These variables indicate recent activity when
+         ;   not 0.  They are set in this module to a fixed value when the
+         ;   particular activity is detected, then counted down automatically
+         ;   by the interrupt routine.  For the purpose of the LED display, we
+         ;   only care whether these values are 0 or not.
+         ;
+         extern  cn_host     ;host communication activity
+         extern  cn_tron     ;target is being accessed
+         extern  cn_writ     ;target is being written to
 
-         extern  cn_host     ;time until host activity considered over
-         extern  cn_tron     ;time until target no longer considered on
-         extern  cn_writ     ;time until no longer considered writing to target
          extern  ledbri      ;phase 1 brightness in low nibble, phase 2 in high
-         extern  ledph1      ;phase 1 time in 5mS units
-         extern  ledph2      ;phase 2 time in 5mS units
-         extern  cntled      ;5mS ticks until next LED phase
+         extern  ledph1      ;phase 1 time in 5 ms units
+         extern  ledph2      ;phase 2 time in 5 ms units
+         extern  cntled      ;5 ms ticks until next LED phase
          extern_flags        ;declare global flag bits EXTERN
-;
+
 ;*******************************************************************************
 ;
 ;   Configuration constants.
@@ -44,7 +51,7 @@ leds_prog equ    4           ;the target is being programmed
 ;   Derived constants.
 ;
 lbankadr equ     bankadr(lbank) ;address within local state register bank
-;
+
 ;*******************************************************************************
 ;
 ;   Global state.  All this state is assumed to be in the GBANK register
@@ -52,7 +59,7 @@ lbankadr equ     bankadr(lbank) ;address within local state register bank
 ;
          defram  gbankadr
 
-;
+
 ;*******************************************************************************
 ;
 ;   Local state.
@@ -62,25 +69,22 @@ lbankadr equ     bankadr(lbank) ;address within local state register bank
 leds     res     1           ;current LED state, use LEDS_xxx constants
 
 .led     code
-;
 ;*******************************************************************************
 ;
 ;   Macro SETLED ms1, bri1, ms2, bri2
 ;
 ;   Set the LED display strategy.
 ;
-;   The LED display state is automatically alternated between two
-;   "phases".  MS1 and BRI1 set the time and brightness for phase 1,
-;   and MS2 and BRI2 for phase 2.  MS1 and MS2 are in units of
-;   milliseconds.  These values will be rounded and clipped to the
-;   available internal resolution.  BRI1 and BRI2 are the desired
-;   brightness during each of the phases.  The brightness values
-;   range from 0 to 15 and are linear.  0 results in off, and 15
-;   results in full on.  Out of range values will be clipped to the
-;   nearest allowed value.
+;   The LED display state is automatically alternated between two "phases".  MS1
+;   and BRI1 set the time and brightness for phase 1, and MS2 and BRI2 for phase
+;   2.  MS1 and MS2 are in units of milliseconds.  These values will be rounded
+;   and clipped to the available internal resolution.  BRI1 and BRI2 are the
+;   desired brightness during each of the phases.  The brightness values range
+;   from 0 to 15 and are linear.  0 results in off, and 15 results in full on.
+;   Out of range values will be clipped to the nearest allowed value.
 ;
-;   The LED display will immediately be switched to the start of
-;   the new phase 1.
+;   The LED display will immediately be switched to the start of the new phase
+;   1.
 ;
 ;   W is trashed.
 ;

@@ -39,6 +39,7 @@ debug_clrusbbuf equ 0        ;clear USB I/O buffers to 0 at startup
 /const   reset_slow bool = false ;use slower reset, non-standard hardware workaround
 /const   pwminst integer = 250 ;instruction cycles in PWM period
 /const   tickinst integer = 1000 ;instruction cycles per base clock tick
+/const   usbsofsec real = 1.0 ;interval to check for USB start of frames, seconds
 
 /include "eusblib.ins.aspic"
 ;
@@ -67,11 +68,14 @@ tsksave  set     tsksave | regf5
 tsksave  set     tsksave | regf6
 tsksave  set     tsksave | regf7
 ;
-;   Derived constants.
+;   Global definitions required by library code.
 ;
 /include "(cog)src/pic/task_setup.ins.aspic"
-/include "eusb_usb.ins.aspic" ;global definitions required by USB subsystem
-
+/include "(cog)src/pic/usb_setup.ins.aspic"
+/include "eusb_usb.ins.aspic" ;define our USB configuration
+;
+;   Derived constants.
+;
 /const   cmduart bool = [and uart_cmdsrc [not debug_cmduart]] ;UART is commands source
 /const   datuart bool = [and [not uart_cmdsrc] [not debug_cmduart]] ;UART is data port
 
@@ -106,8 +110,8 @@ t2pms    equ     freq_inst / (tickinst * 1000) ;base clock ticks per millisecond
 ;   least to most significant byte order.
 ;
 rsp_ack  equ     1           ;last command acknowledged, clear to send next
-;
-;**********
+
+;*******************************************************************************
 ;
 ;   Global flag bits.  As many GFL0 thru GFLn variables as needed are
 ;   automatically created by the /FLAG preprocessor directive.  After all
@@ -135,13 +139,15 @@ rsp_ack  equ     1           ;last command acknowledged, clear to send next
 /flag    promcmd             ;non-volatile memory is acquired by command processor
 /flag    promusb0            ;non-volatile memory is acquired by USB endpoint 0 handler
 /flag    cmdreset            ;command processor should reset itself
+/flag    prev_usbon          ;USB was on and available to app last iteration
+/flag    usbsoft             ;time to check for any USB start of frames received
 
 /if cmduart then
   /flag inusb                ;command is coming from the USB
   /flag sendack              ;command received via interface that requires ACK rsp
   /endif
-;
-;**********
+
+;*******************************************************************************
 ;
 ;   I/O pin declarations.  /INBIT and /OUTBIT are preprocessor
 ;   directives.  Each one defines a single I/O pin.  See the PREPIC

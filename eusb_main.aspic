@@ -20,26 +20,31 @@
 /include "eusb.ins.aspic"
 
          extern_flags        ;declare global flag bits EXTERN
-;
+         extern  tick10ms    ;10 ms clock tick counter
+
 ;*******************************************************************************
 ;
 ;   Configuration constants.
 ;
 lbank    equ     1           ;register bank for the local state of this module
+/const   tickt   real = 0.010 ;period of clock ticks received
 ;
 ;   Derived constants.
 ;
 lbankadr equ     bankadr(lbank) ;address within local state register bank
-;
+/const   softk   integer = [rnd [/ usbsofsec tickt]] ;ticks for USB SoF check interval
+
 ;*******************************************************************************
 ;
 ;   Local state.
 ;
          defram  lbankadr
 
+last10ms res     1           ;last 10 ms clock tick counter up to date with
+softk    res     1           ;ticks until next USB SoF check interval ends
+
 
 .main    code
-;
 ;*******************************************************************************
 ;
 ;   Routine MAIN
@@ -48,13 +53,16 @@ lbankadr equ     bankadr(lbank) ;address within local state register bank
 ;   initialization is complete.
 ;
          glbent  main
-;
+
 ;**********
 ;
 ;   Initialize the state managed by this module.
 ;
+         movff   tick10ms, last10ms ;init last 10 ms tick counter up to date with
 
-;
+         dbankif lbankadr
+         loadk8  softk, [v softk] ;init to full wait until first USB SoF check
+
 ;**********
 ;
 ;   Main application loop.  Back here to look for something to do.
@@ -83,6 +91,67 @@ no_usbreset
 ;   Re-evaluate the LED display based on the current system state.
 ;
          gcall   led_update
+;
+;   Process clock ticks and set any event conditions accordingly.  Clock ticks
+;   are received by the global variable TICK10MS being automatically incremented
+;   every 10 ms.
+;
+         dbankif gbankadr
+         movf    tick10ms, w ;get current 10 ms clock tick counter
+         dbankif lbankadr
+         xorwf   last10ms, w ;compare to last value up to date with
+         bz      d_tick      ;no new 10 ms clock tick ?
+         ;
+         ;   A 10 ms clock tick has occurred.
+         ;
+         dbankif lbankadr
+         incf    last10ms    ;update clock value now current with
+         ;
+         ;   Count USB start of frame checking interval.  Set flag USBSOFT if
+         ;   the current interval has elapsed.
+         ;
+         dbankif lbankadr
+         decfsz  softk       ;one less tick until USB SoF interval elapsed
+         jump    d_softick   ;not elapsed now, done with SoF interval tick
+
+         loadk8  softk, [v softk] ;reset counter to start of new interval
+         setflag usbsoft     ;indicate to check for SoF received
+d_softick unbank             ;done handling USB SoF interval tick
+
+d_tick   unbank              ;done with clock tick processing
+;
+;   Check that USB start of frames were received over the last interval.
+;   Glitches on the USB data lines can cause the USB peripheral to hang without
+;   indicating any error.  When that happens, start of frames are no longer
+;   received.
+;
+;   Start of frames should be received every 1 ms during normal USB operation.
+;   If none was received within a full USBSOFSEC interval, then something is
+;   definitely wrong.  In that case, we reset the processor.  That causes the
+;   USB peripheral to be reset, and the host to see the device go away from the
+;   USB, then re-appear.
+;
+         skip_flag usbsoft   ;time to check for any USB SoF received ?
+         jump    d_usbframe  ;no, skip this section
+
+         clrflag usbsoft     ;clear the event condition
+         skip_flag usbframe  ;USB SoF seen during last interval ?
+         jump    no_sof      ;no
+         ;
+         ;   Start of frames were seen, all is normal.
+         ;
+         clrflag usbframe    ;reset to no SoF seen in new interval yet
+         jump    d_usbframe
+         ;
+         ;   Not start of frames were seen during the last interval.  We assume
+         ;   the USB peripheral is wedged.
+         ;
+no_sof   unbank
+         gcall   usb_off     ;stop USB communication, reset USB hardware
+         waitms  1000        ;leave time for host to see this USB device gone
+         reset               ;reset processor, eventually restart USB comms
+
+d_usbframe unbank            ;done checking for USB start of frames
 
          jump    loop_main   ;back to check all event conditions again
 
