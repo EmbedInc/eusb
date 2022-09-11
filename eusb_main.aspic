@@ -14,8 +14,8 @@
 ;   * its use.                                                    *
 ;   ***************************************************************
 ;
-;   This module contains the main application routine that is run after
-;   the system is initialized.
+;   This module contains the main application routine that is run after the
+;   system is initialized.
 ;
 /include "eusb.ins.aspic"
 
@@ -40,8 +40,11 @@ lbankadr equ     bankadr(lbank) ;address within local state register bank
 ;
          defram  lbankadr
 
-last10ms res     1           ;last 10 ms clock tick counter up to date with
-softk    res     1           ;ticks until next USB SoF check interval ends
+usb10ms  res     1           ;10 ms clock USB is up to date with
+
+/if debug then
+         global  usb10ms
+  /endif
 
 
 .main    code
@@ -58,18 +61,14 @@ softk    res     1           ;ticks until next USB SoF check interval ends
 ;
 ;   Initialize the state managed by this module.
 ;
-         movff   tick10ms, last10ms ;init last 10 ms tick counter up to date with
-
-         dbankif lbankadr
-         loadk8  softk, [v softk] ;init to full wait until first USB SoF check
+         movff   tick10ms, usb10ms ;init clock USB routines are up to date with
 
 ;**********
 ;
-;   Main application loop.  Back here to look for something to do.
-;   Whenever something is found that needs handling, a handler routine
-;   is jumped to.  All handler routines jump back to LOOP_MAIN when done.
-;   This means events are checked in priority order, with high priority
-;   events checked earlier.
+;   Main application loop.  Back here to look for something to do.  Whenever
+;   something is found that needs handling, a handler routine is jumped to.  All
+;   handler routines jump back to LOOP_MAIN when done.  This means events are
+;   checked in priority order, with high priority events checked earlier.
 ;
          glbent  loop_main
          gcall   task_yield  ;give other tasks a chance to run
@@ -92,66 +91,23 @@ no_usbreset
 ;
          gcall   led_update
 ;
-;   Process clock ticks and set any event conditions accordingly.  Clock ticks
-;   are received by the global variable TICK10MS being automatically incremented
-;   every 10 ms.
+;   Notify the USB routines of any new elapsed milliseconds.
 ;
+loop_usbtick unbank          ;back here after processing a USB clock tick
          dbankif gbankadr
-         movf    tick10ms, w ;get current 10 ms clock tick counter
+         movf    tick10ms, w ;get the current 10 ms clock tick counter
          dbankif lbankadr
-         xorwf   last10ms, w ;compare to last value up to date with
-         bz      d_tick      ;no new 10 ms clock tick ?
+         xorwf   usb10ms, w  ;compare to value USB is up to date with
+         bz      d_usbtick   ;no more clock ticks for USB this iteration ?
          ;
-         ;   A 10 ms clock tick has occurred.
+         ;   There is a new clock tick.
          ;
-         dbankif lbankadr
-         incf    last10ms    ;update clock value now current with
-         ;
-         ;   Count USB start of frame checking interval.  Set flag USBSOFT if
-         ;   the current interval has elapsed.
-         ;
-         dbankif lbankadr
-         decfsz  softk       ;one less tick until USB SoF interval elapsed
-         jump    d_softick   ;not elapsed now, done with SoF interval tick
+         incf    usb10ms     ;update clock value now current with
+         loadk8  reg0, 10    ;pass number of ms elapsed
+         gcall   usb_tick    ;notify USB routines of new elapsed time
+         jump    loop_usbtick ;back to check for possible additional ticks
 
-         loadk8  softk, [v softk] ;reset counter to start of new interval
-         setflag usbsoft     ;indicate to check for SoF received
-d_softick unbank             ;done handling USB SoF interval tick
-
-d_tick   unbank              ;done with clock tick processing
-;
-;   Check that USB start of frames were received over the last interval.
-;   Glitches on the USB data lines can cause the USB peripheral to hang without
-;   indicating any error.  When that happens, start of frames are no longer
-;   received.
-;
-;   Start of frames should be received every 1 ms during normal USB operation.
-;   If none was received within a full USBSOFSEC interval, then something is
-;   definitely wrong.  In that case, we reset the processor.  That causes the
-;   USB peripheral to be reset, and the host to see the device go away from the
-;   USB, then re-appear.
-;
-         skip_flag usbsoft   ;time to check for any USB SoF received ?
-         jump    d_usbframe  ;no, skip this section
-
-         clrflag usbsoft     ;clear the event condition
-         skip_flag usbframe  ;USB SoF seen during last interval ?
-         jump    no_sof      ;no
-         ;
-         ;   Start of frames were seen, all is normal.
-         ;
-         clrflag usbframe    ;reset to no SoF seen in new interval yet
-         jump    d_usbframe
-         ;
-         ;   Not start of frames were seen during the last interval.  We assume
-         ;   the USB peripheral is wedged.
-         ;
-no_sof   unbank
-         gcall   usb_off     ;stop USB communication, reset USB hardware
-         waitms  1000        ;leave time for host to see this USB device gone
-         reset               ;reset processor, eventually restart USB comms
-
-d_usbframe unbank            ;done checking for USB start of frames
+d_usbtick unbank             ;done with clock ticks for USB routines
 
          jump    loop_main   ;back to check all event conditions again
 

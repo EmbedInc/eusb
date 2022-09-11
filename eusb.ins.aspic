@@ -139,8 +139,6 @@ rsp_ack  equ     1           ;last command acknowledged, clear to send next
 /flag    promcmd             ;non-volatile memory is acquired by command processor
 /flag    promusb0            ;non-volatile memory is acquired by USB endpoint 0 handler
 /flag    cmdreset            ;command processor should reset itself
-/flag    prev_usbon          ;USB was on and available to app last iteration
-/flag    usbsoft             ;time to check for any USB start of frames received
 
 /if cmduart then
   /flag inusb                ;command is coming from the USB

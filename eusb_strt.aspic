@@ -138,11 +138,19 @@ cfgosc   set     1
 
          db      b'11111111' ;config 6L, disable all write protection
 
+/if debug_icd then
+         db      b'11111111' ;config 6H
+                 ; ---XXXXX  unused
+                 ; 1-------  disable data EEPROM write protection
+                 ; -1------  disable boot block write protection
+                 ; --1-----  disable configuration write protection
+  /else
          db      b'11011111' ;config 6H
                  ; ---XXXXX  unused
                  ; 1-------  disable data EEPROM write protection
                  ; -1------  disable boot block write protection
                  ; --0-----  enable configuration write protection
+  /endif
 
          db      b'11111111' ;config 7L, disable all table read protection
 
