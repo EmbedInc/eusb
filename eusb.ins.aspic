@@ -22,8 +22,6 @@
 ;
 ;   Debug switches.  These must all be FALSE for production builds.
 ;
-/const   debug_icd bool = false ;build for debugging with ICD, RealIce, etc
-/const   debug   bool = false ;build for any kind of debugging
 /const   debug_cmduart = false ;report cmds sent to target PIC out the UART
 ;
 ;   Debug switches.  The normal production mode for all the MPASM switches

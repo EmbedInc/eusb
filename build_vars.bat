@@ -9,3 +9,6 @@ set fwname=eusb
 set pictype=18F2550
 set picclass=PIC
 set t_parms=
+call treename_var "(cog)src/%srcdir%/debug_%fwname%.bat" tnam
+make_debug "%tnam%"
+call "%tnam%"

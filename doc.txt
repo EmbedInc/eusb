@@ -310,12 +310,12 @@ Firwmare versions
 
     UART is data port, not command source.
 
-  EUSB 38 seq 51, 11 Sep 2022
+  EUSB 38 seq 76, 11 Sep 2022
 
     Updated to new USB library code structure, which now requires using
     USB_SETUP.INS.ASPIC.  Uses USB start of frame loss detection that is
     now built into the generic USB code.  The first SoF must occur 1.5
-    within seconds after startup.  Additional SoF must occur within 100 ms
+    within seconds after startup.  Additional SoF must occur within 1.0 s
     after the previous.  On missing SoF, the USB hardware is reset, a 1
     second wait performed, and the processor is restarted.
 
@@ -330,6 +330,11 @@ Firwmare versions
     under 2 seconds.  It can take several more seconds for the host
     operating system to re-enumerate the "new" hardware and be ready for
     applications to connect to it again.
+
+    The build mechanism and code was updated to the current debug switches
+    handling using environment variables.  Was previously constants in the
+    source code that had to be edited each time to switch between debug
+    and production mode.
 
     UART is data port, not command source.
 
