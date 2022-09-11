@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                               9 September 2022
+                              11 September 2022
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -310,12 +310,48 @@ Firwmare versions
 
     UART is data port, not command source.
 
-  EUSB 38 seq 26, 9 Sep 2022
+  EUSB 38 seq 51, 11 Sep 2022
 
     Updated to new USB library code structure, which now requires using
-    USB_SETUP.INS.ASPIC.
+    USB_SETUP.INS.ASPIC.  Uses USB start of frame loss detection that is
+    now built into the generic USB code.  The first SoF must occur 1.5
+    within seconds after startup.  Additional SoF must occur within 100 ms
+    after the previous.  On missing SoF, the USB hardware is reset, a 1
+    second wait performed, and the processor is restarted.
 
-    Added detection of USB hardware getting wedged.  If so, resets USB,
-    waits 1 second, then resets the processor.
+    It was found that some electrical glitches, such as momentarily
+    shorting the USB D- and PWR lines, could wedge the USB hardware.  No
+    error conditions are signalled, but packets are not transferred.  This
+    state can be detected in the firmware by start of frames no longer
+    being signalled.  The SoF loss detection described above is to recover
+    from wedged USB hardware.  From the host's point of view, the USB
+    device will appear to be disconnected then reconnected.  The device
+    will therefore be newly enumerated.  The hardware will recover in
+    under 2 seconds.  It can take several more seconds for the host
+    operating system to re-enumerate the "new" hardware and be ready for
+    applications to connect to it again.
 
     UART is data port, not command source.
+
+    Data memory usage:
+
+           .REGS: 000-010, length    17, type UDATA
+      .udata_acs: 011-050, length    64, type UDATA
+                  051-05F, length    15
+          .STACK: 060-09F, length    64, type UDATA
+          .BANK0: 0A0-0A0, length     1, type UDATA
+      .TASK1CTRL: 0A1-0E5, length    69, type UDATA
+                  0E6-0FF, length    26
+
+          .BANK1: 100-1A4, length   165, type UDATA
+      .TASK2CTRL: 1A5-1E9, length    69, type UDATA
+                  1EA-1FF, length    22
+
+      .TASK0CTRL: 200-244, length    69, type UDATA
+                  245-2FF, length   187
+
+          .BANK3: 300-3FF, length   256, type UDATA
+
+          .USBBD: 400-455, length    86, type UDATA
+         .USBBUF: 456-605, length   432, type UDATA
+                  606-6FF, length   250
