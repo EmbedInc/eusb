@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                              11 September 2022
+                              14 September 2022
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -360,3 +360,7 @@ Firwmare versions
           .USBBD: 400-455, length    86, type UDATA
          .USBBUF: 456-605, length   432, type UDATA
                   606-6FF, length   250
+
+  EUSB 39
+
+    Removed unused constants from MAIN module.

@@ -27,12 +27,10 @@
 ;   Configuration constants.
 ;
 lbank    equ     1           ;register bank for the local state of this module
-/const   tickt   real = 0.010 ;period of clock ticks received
 ;
 ;   Derived constants.
 ;
 lbankadr equ     bankadr(lbank) ;address within local state register bank
-/const   softk   integer = [rnd [/ usbsofsec tickt]] ;ticks for USB SoF check interval
 
 ;*******************************************************************************
 ;
