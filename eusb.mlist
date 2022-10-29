@@ -6,6 +6,7 @@ eusb_f16.o
 eusb_f16b.o
 eusb_f16e.o
 eusb_f18.o
+eusb_f18b.o
 eusb_f30.o
 eusb_init.o
 eusb_intr.o
