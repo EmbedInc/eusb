@@ -43,10 +43,11 @@ lbank    equ     1           ;register bank for the local state of this module
 ;   Symbolic constants for the various states indicated by the LED.
 ;
 leds_unk equ     0           ;LED state is unknown, must always be 0
-leds_idle equ    1           ;the unit is idle
-leds_host equ    2           ;host communication but no target activity
-leds_tron equ    3           ;the target is on
-leds_prog equ    4           ;the target is being programmed
+leds_uoff equ    1           ;USB hardware being held in off state
+leds_idle equ    2           ;the unit is idle
+leds_host equ    3           ;host communication but no target activity
+leds_tron equ    4           ;the target is on
+leds_prog equ    5           ;the target is being programmed
 ;
 ;   Derived constants.
 ;
@@ -67,6 +68,7 @@ lbankadr equ     bankadr(lbank) ;address within local state register bank
          defram  lbankadr
 
 leds     res     1           ;current LED state, use LEDS_xxx constants
+
 
 .led     code
 ;*******************************************************************************
@@ -138,7 +140,7 @@ i2       set     255
          intr_on             ;re-enable interrupts
 
          endm
-;
+
 ;*******************************************************************************
 ;
 ;   Subroutine LED_INIT
@@ -151,7 +153,7 @@ i2       set     255
          clrf    leds        ;init LED state to unknown
 
          leaverest
-;
+
 ;*******************************************************************************
 ;
 ;   Subroutine LED_HOSTIO
@@ -167,7 +169,7 @@ i2       set     255
          movwf   cn_host
 
          leaverest
-;
+
 ;*******************************************************************************
 ;
 ;   Subroutine LED_WRITING
@@ -183,7 +185,28 @@ i2       set     255
          movwf   cn_writ
 
          leaverest
+
+;*******************************************************************************
 ;
+;   Local subroutine LED_SET_UOFF
+;
+;   Set the LED to indicate the USB hardware is being held in the off state.
+;
+         locsub  led_set_uoff, noregs
+
+         dbankif lbankadr
+         movlw   leds_uoff   ;get desired LED state
+         xorwf   leds, w     ;compare to the current state
+         skip_nz             ;need to change the state ?
+         jump    suoff_leave ;no, nothing more to do
+
+         movlw   leds_uoff   ;indicate the new state
+         movwf   leds
+         setled  1000, 0, 1000, 0
+
+suoff_leave
+         leaverest
+
 ;*******************************************************************************
 ;
 ;   Local subroutine LED_SET_IDLE
@@ -204,7 +227,7 @@ i2       set     255
 
 sidl_leave
          leaverest
-;
+
 ;*******************************************************************************
 ;
 ;   Local subroutine LED_SET_TRON
@@ -225,7 +248,7 @@ sidl_leave
 
 strn_leave
          leaverest
-;
+
 ;*******************************************************************************
 ;
 ;   Local subroutine LED_SET_HOST
@@ -246,7 +269,7 @@ strn_leave
 
 shos_leave
          leaverest
-;
+
 ;*******************************************************************************
 ;
 ;   Local subroutine LED_SET_PROG
@@ -267,7 +290,7 @@ shos_leave
 
 sprg_leave
          leaverest
-;
+
 ;*******************************************************************************
 ;
 ;   Subroutine LED_UPDATE
@@ -296,6 +319,12 @@ done_tron                    ;done updating target on timer
 ;
 ;   Set the LED display according to the highest active state.
 ;
+         skip_flag usboff    ;USB hardware being held in off state ?
+         jump    upd_nuoff   ;no
+         mcall   led_set_uoff
+         jump    upd_leave
+upd_nuoff dbankis gbankadr
+
          dbankif gbankadr
          movf    cn_writ
          skip_nz             ;target is being written to ?

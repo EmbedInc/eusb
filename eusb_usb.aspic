@@ -148,7 +148,9 @@ lbank    equ     1           ;register bank for the local state of this module
 //   work.
 //
 /macro no_sof
-         waitms  1000        ;leave time for host to see this USB device gone
+         setflag usboff      ;indicate USB hardware is being held in off state
+         gcall   led_update  ;update the LED display accordingly
+         waitms  2000        ;leave time for host to see this USB device gone
          reset               ;reset processor, eventually restart USB comms
   /endmac
 
