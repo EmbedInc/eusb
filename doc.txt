@@ -1,5 +1,5 @@
                        USBProg Programmer EUSB Firmware
-                               16 November 2022
+                               25 November 2022
 
 This document describes the outside view of the EUSB firmware within the
 USBProg PIC programmer.
@@ -370,10 +370,15 @@ Firwmare versions
 
     UART is data port, not command source.
 
-  EUSB 40
+  EUSB 40 seq 5, 25 Nov 2022
 
     LED is now off during the time the USB hardware is kept off before the
     processor is reset.  This occurs when the USB hardware is detected to
     be wedged.
 
     Changed USB hardware off time before reset from 1 second to 2 seconds.
+
+    Uses new PPROG library code that explicitly sets the address of a 18FB
+    whenever the address is 0.
+
+    UART is data port, not command source.
